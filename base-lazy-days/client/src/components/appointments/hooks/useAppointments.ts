@@ -1,6 +1,12 @@
 // @ts-nocheck
 import dayjs from 'dayjs';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 
 import { axiosInstance } from '../../../axiosInstance';
@@ -27,6 +33,11 @@ interface UseAppointments {
   showAll: boolean;
   setShowAll: Dispatch<SetStateAction<boolean>>;
 }
+
+const commonOptions = {
+  staleTime: 0,
+  cacheTime: 300000, // 5 minutes
+};
 
 // The purpose of this hook:
 //   1. track the current month/year (aka monthYear) selected by the user
@@ -60,6 +71,10 @@ export function useAppointments(): UseAppointments {
   //   appointments that the logged-in user has reserved (in white)
   const { user } = useUser();
 
+  const selectFn = useCallback((data) => getAvailableAppointments(data, user), [
+    user,
+  ]);
+
   /** ****************** END 2: filter appointments  ******************** */
   /** ****************** START 3: useQuery  ***************************** */
   // useQuery call for appointments for the current monthYear
@@ -69,6 +84,9 @@ export function useAppointments(): UseAppointments {
     queryClient.prefetchQuery(
       [queryKeys.appointments, nextMonthYear.year, nextMonthYear.month],
       () => getAppointments(nextMonthYear.year, nextMonthYear.month),
+      {
+        ...commonOptions,
+      },
     );
   }, [queryClient, monthYear]);
 
@@ -83,6 +101,14 @@ export function useAppointments(): UseAppointments {
   const { data: appointments = fallback } = useQuery(
     [queryKeys.appointments, monthYear.year, monthYear.month],
     () => getAppointments(monthYear.year, monthYear.month),
+    {
+      select: showAll ? undefined : selectFn,
+      ...commonOptions,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchInterval: 60000,
+    },
   );
 
   /** ****************** END 3: useQuery  ******************************* */
